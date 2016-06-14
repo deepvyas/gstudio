@@ -1,0 +1,142 @@
+{% load get_username get_thread_node get_disc_replies get_node check_is_gstaff from ndf_tags %}
+{% load i18n %}
+
+{% check_is_gstaff group_id request.user as is_gstaff %}
+<style type="text/css">
+    .lbl_of_tag{
+        background-color: gold !important;
+    }
+
+</style>
+    <div class="row note-toolbar">
+        <div class="small-12 medium-10 columns">
+
+            <div class="row">
+                <div class="small-12 columns">
+                   <span class="note-title">{{node.name}}</span>
+                   {% if node.tags %}
+                        <div class="tag-rating-div">
+                                {% for tag in node.tags %}
+                                    {% if forloop.counter < 3 %}
+                                        <small><label class="lbl_of_tag label">
+                                    {% else %}
+                                        <small><label class="lbl_of_tag label tag_ele hide">
+                                    {% endif %}
+                                    <a href="{% url 'tag_info' groupid tag %}">{{tag}} </a></label></small>
+                                {% endfor %}
+                                {% if node.tags|length > 2 %}
+                                    <small><label class="view-more-tags" style="display:inline-block;">More</label></small>
+                                {% endif %}
+                        </div>
+                    {% else %}
+                        <i><small><label>{% trans "No tags defined yet!" %}</label></small></i>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="row">
+                <div class="small-12 columns creator-title">
+                    <i class="fi-torso"></i>
+
+                    <span class="note-creator" title="{{node.created_by|get_username}}">{{node.created_by|get_username}}</span>
+                    &nbsp;
+                    &#8226;
+                    &nbsp;
+                    <span class="note-creation-date">{{node.created_at|date:"d M Y h:i A"}}</span>
+                    &nbsp;
+                        &#8226;
+                        &nbsp;
+
+                    <div style="display: inline-block;" class="creator-rating">
+                    {# <div>Your rating</div> #}
+
+                        <div>
+                        {% include 'ndf/rating.html'%}
+                        {% comment %}
+                            <i class="fi-like"></i>
+                            <i class="fi-like"></i>
+                            <i class="fi-like"></i>
+                            <i class="fi-like"></i>
+                            <i class="fi-like"></i>
+                        {% endcomment %}
+                        </div>
+                    </div>
+                    &nbsp;
+                        &#8226;
+                        &nbsp;
+                    <div style="display: inline-block;">
+
+                        {% include "ndf/analytics_views.html" %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="small-12 medium-2 columns creator-rating">
+            {% if is_gstaff or node.created_by == request.user.id %}
+                <a href="{% url 'page_create_edit' group_id node.pk %}?course_event_id={{group_id}}&blog_type=True"
+                    style="float:right;     border: 1px solid #CFCFCF; padding: 5px 10px; border-radius: 3px;color:#A2A2A2;background-color: #f7f7f7;"><i class="fi-pencil" style="margin-right: 5px;"></i>Edit</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="row note-content">
+        <div class="small-12 columns">
+            <div class="note-header row">
+
+
+            </div>
+            <div class="note-text row">
+            {{node.content|default_if_none:"No Description added yet!"|safe}}
+            </div>
+        </div>
+    </div>
+    <div class="comment-sections">
+        {% get_thread_node node.pk as thread_node %}
+            {% if thread_node %}
+                {% get_disc_replies thread_node group_id global_disc_all_replies as all_replies %}
+                {% get_node thread_node as thread_node_obj %}
+                {% include 'ndf/gin-line-texteditor.html' with node=thread_node_obj var_name="content_org" ckeditor_toolbar="BasicToolbar" %}
+            {% else %}
+                {% get_disc_replies node.pk group_id global_disc_all_replies as all_replies %}
+                {% include 'ndf/gin-line-texteditor.html' with var_name="content_org" ckeditor_toolbar="BasicToolbar" %}
+            {% endif %}
+    </div>
+    {% comment %}
+        <div class="comments-header">
+            <i class="fi-eye"></i>
+            <span class="viewed-count">214</span>
+            views
+            <i class="fi-like"></i>
+            <span class="likes-count">10</span>
+            likes
+            <i class="fi-comments"></i>
+            <span class="comment-count">22</span>
+            comments
+        </div>
+        <div class="new-comment row">
+            <div class="small-1 columns user-prof-image">
+                <i class="fi-torso"></i>
+            </div>
+            <div class="small-9 columns">
+                <textarea class="add-comment textarea-add-comment" name="textarea-add-comment"></textarea>
+            </div>
+            <div class="small-2 columns">
+                <a href="#" id="postCommentBtn" class="button small">Post</a>
+            </div>
+        </div>
+        <div class="row comments">
+        </div>
+    </div>
+    {% endcomment %}
+
+<script type="text/javascript">
+$(document).on('click','.view-more-tags',function(){
+    if($(this).text()=="Less"){
+        $(".tag_ele").addClass("hide")
+        $(this).text("More")
+    }
+    else{
+        $(".tag_ele").removeClass("hide")
+        $(this).text("Less")
+    }
+})
+
+</script>

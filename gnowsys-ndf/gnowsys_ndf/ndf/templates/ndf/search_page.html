@@ -1,0 +1,527 @@
+{% extends "ndf/base.html" %}
+{% load i18n %}
+{% block title %}{% trans 'Search' %}{% endblock %}
+{% block concern_information %}
+    <div id="search_help" align="justify">
+      <h3><strong>Search Help</strong></h3>
+      <ul>
+          <li><strong>Keyword search </strong>
+              <ul>
+                    <li>It searches all the public resources for the keywords provided.</li>
+                    {% comment %}<li>Search by name, tags, contents and on specific users. </li>{% endcomment %}
+              </ul><br>
+                </ul>
+
+    </div>
+{% endblock %}
+
+{% block body_content %} 
+
+<hr>
+      <div id="results" width="100%" style="position:relative">
+      
+      
+      </div>
+
+<div id="pages">
+  
+</div>
+<hr>
+   {% comment %} 
+    <dl class="accordion" data-accordion>
+        <dd class="accordion-navigation" data-options="deep_linking:true">
+              <a href="#panel1" style="background-color: #2980B9; color:#FFF">Search</a>
+              <div id="panel1" class="content active small-12 large-4 columns">
+                
+                           <!-- <h1>Search</h1> -->
+
+                          <form name="search_form" method="GET" action="{% url 'results' groupid %}">
+                            {% csrf_token %}
+                            Enter the value to be searched:
+                            <input type="text" class="small-2 columns" name="search_text" id="search_text" required>
+                            <h5> Search by: </h5>
+                            <input type="checkbox" name="search_fields" checked="true" id="chk_name" value="name" />Name
+                            <input type="checkbox" name="search_fields" checked="true" id="chk_tags" value="tags" />Tags 
+                            <input type="checkbox" name="search_fields" checked="true" id="chk_content" value="contents" />Content <br>
+                            Search particular user: 
+                            <select name="users" required>
+                              <option value="all">All users</option>
+                              {% for mem in authors %}    
+                                <option value="hello">{{ mem }} </option>
+                                {% endfor %}
+                            </select>
+
+                            <input type="submit" class="button" name="subButton2" id="subButton2" value="Submit" />
+                          </form>
+        
+                
+              </div>
+        
+        </dd>
+    </dl>
+    {% endcomment %}
+<script>
+  /********************************************************************************
+  THIS SCRIPT EXTRACTS THE GET VARIABLES FROM THE URL AND CONVERTS IT INTO A DICTIONARY - "VARS"  
+  **********************************************************************************/
+  function getUrlVars() {
+      var vars = {};
+      var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+          vars[key] = value;
+      });
+      return vars;
+  }
+
+  // ASSIGN THE SEARCHED QUERY TO THE INPIT BOX AGAIN
+  var search_key = String(getUrlVars()["search_text"]);
+  search_key = search_key.split('+').join(' ');
+  $('#search_text').val(search_key);
+
+</script>
+
+<script type="text/javascript">
+  var html_div = [];
+  var group = "{{ groupid }}";
+  var base_url = location.host+"/"+group+"/";
+  var page_no = 0;
+  var results_per_page = 12;
+  var results_in_current_page = 0;
+  var cur_page = 0;
+
+  $(document).ready(function() {
+
+    sData = "{{ search_results }}";
+    sData = sData.replace(/&quot;/g, '"');  
+    //sData = sData.replace(/&#39;/g, "'");
+    //sData = sData.replace(/u'/g, "'");
+    sData = jQuery.parseJSON(sData);
+
+    if ('{{search_type}}' == "KEYWORD_SEARCH") {
+        parse_data_kwd(sData);
+    }
+    else if ('{{search_type}}' == "ADVANCED_SEARCH" || '{{search_type}}' == "RELATION_SEARCH" || '{{search_type}}' == "SEMANTIC_SEARCH"){
+        parse_data_adv(sData);
+    }
+    
+    function parse_data_kwd(sData) {
+  $("#panel1").addClass("active");
+        $("#panel2").removeClass("active");
+    
+      // -------------------------------- SEARCH BY NAME ------------------------------------------- //
+      var a = sData.exact.name.length;
+        html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';      
+        for (i=0; i<a; i++) {
+          
+          // ASSIGN THE TYPE FIELD AND CHANGE IT IF IT IS A QUIZ/DETAIL
+          if (sData.exact.name[i].link != null) {
+            type = alterType(sData.exact.name[i].link);
+            // console.log(type);
+
+            GSystem_link = assignLink(type, sData.exact.name[i].link.toLowerCase(), sData.exact.name[i]._id);
+            html_div[cur_page] += generateCard(sData.exact.name[i].name, type, sData.exact.name[i].created_by, sData.exact.name[i].last_update, GSystem_link);
+
+            results_in_current_page += 1;
+            if (results_in_current_page >= results_per_page) {
+              html_div[cur_page] += "</ul>";
+              cur_page += 1;
+              results_in_current_page = 0;
+              html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';
+            }                   
+          }
+      }
+                
+      a = sData.stemmed.name.length;
+      for (i=0; i<a; i++) {
+
+        // ASSIGN THE TYPE FIELD AND CHANGE IT IF IT IS A QUIZ/DETAIL
+        if (sData.stemmed.name[i].link != null) {
+          type = alterType(sData.stemmed.name[i].link);
+
+          GSystem_link = assignLink(type, sData.stemmed.name[i].link.toLowerCase(), sData.stemmed.name[i]._id);
+          html_div[cur_page] += generateCard(sData.stemmed.name[i].name, type, sData.stemmed.name[i].created_by, sData.stemmed.name[i].last_update, GSystem_link);
+
+          results_in_current_page += 1;
+          if (results_in_current_page >= results_per_page) {
+            html_div[cur_page] += "</ul>";
+            cur_page += 1;
+            results_in_current_page = 0;
+            html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';
+          }
+        }
+      }  
+      // -------------------------------------------------------------------------------- //
+      
+      // -------------------- SEARCH BY TAGS ------------------------------------------- //
+      a = sData.exact.tags.length;
+      for (i=0; i<a; i++) { 
+
+        // ASSIGN THE TYPE FIELD AND CHANGE IT IF IT IS A QUIZ/DETAIL
+        if (sData.exact.tags[i].link != null) {
+          type = alterType(sData.exact.tags[i].link);
+
+          GSystem_link = assignLink(type, sData.exact.tags[i].link.toLowerCase(), sData.exact.tags[i]._id);
+          html_div[cur_page] += generateCard(sData.exact.tags[i].name, type, sData.exact.tags[i].created_by, sData.exact.tags[i].last_update, GSystem_link);
+
+          results_in_current_page += 1;
+          if (results_in_current_page >= results_per_page) {
+            html_div[cur_page] += "</ul>";
+            cur_page += 1;
+            results_in_current_page = 0;
+            html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';
+          }
+        }
+      }
+      
+
+      a = sData.stemmed.tags.length;
+      for (i=0; i<a; i++) {
+        
+        // ASSIGN THE TYPE FIELD AND CHANGE IT IF IT IS A QUIZ/DETAIL
+        if (sData.stemmed.tags[i].link != null) {
+          type = alterType(sData.stemmed.tags[i].link);
+
+          GSystem_link = assignLink(type, sData.stemmed.tags[i].link.toLowerCase(), sData.stemmed.tags[i]._id);
+          html_div[cur_page] += generateCard(sData.stemmed.tags[i].name, type, sData.stemmed.tags[i].created_by, sData.stemmed.tags[i].last_update, GSystem_link);
+
+          results_in_current_page += 1;
+          if (results_in_current_page >= results_per_page) {
+            html_div[cur_page] += "</ul>";
+            cur_page += 1;
+            results_in_current_page = 0;
+            html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';
+          }
+        }
+      }
+    
+
+      // -------------------- SEARCH BY CONTENTS ------------------------------------------- //
+      a = sData.exact.content.length;
+      for (i=0; i<a; i++) {
+        
+        // ASSIGN THE TYPE FIELD AND CHANGE IT IF IT IS A QUIZ/DETAIL
+        if (sData.exact.content[i].link != null) {
+          type = alterType(sData.exact.content[i].link);
+
+          GSystem_link = assignLink(type, sData.exact.content[i].link.toLowerCase(), sData.exact.content[i]._id);
+          html_div[cur_page] += generateCard(sData.exact.content[i].name, type, sData.exact.content[i].created_by, sData.exact.content[i].last_update, GSystem_link);
+
+          results_in_current_page += 1;
+          if (results_in_current_page >= results_per_page) {
+            html_div[cur_page] += "</ul>";
+            cur_page += 1;
+            results_in_current_page = 0;
+            html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';
+          }
+        }
+      }     
+
+      a = sData.stemmed.content.length;
+      for (i=0; i<a; i++) {
+        
+        // ASSIGN THE TYPE FIELD AND CHANGE IT IF IT IS A QUIZ/DETAIL
+        if (sData.stemmed.content[i].link != null) {
+          type = alterType(sData.stemmed.content[i].link);
+
+          GSystem_link = assignLink(type, sData.stemmed.content[i].link.toLowerCase(), sData.stemmed.content[i]._id);
+          html_div[cur_page] += generateCard(sData.stemmed.content[i].name, type, sData.stemmed.content[i].created_by, sData.stemmed.content[i].last_update, GSystem_link);
+
+          results_in_current_page += 1;
+          if (results_in_current_page >= results_per_page) {
+            html_div[cur_page] += "</ul>";
+            cur_page += 1;
+            results_in_current_page = 0;
+            html_div[cur_page] = '<ul class="small-block-grid-1 medium-block-grid-3 large-block-grid-4">';
+          }
+        }
+      }
+      
+      $("#results").html(html_div[page_no]);
+
+      pages = "<div style='font-weight:bold; color:#6F6F6F'>Pages:</div><hr>";
+      if(results_in_current_page>0){
+        pages += "<ul style='float:left; list-style-type:none;'>";
+
+        for (i=0; i < cur_page+1; i++) {
+          pages+= "<span onClick='changePage(" + i + ")' style='cursor:pointer;font-weight:bold;padding-left:10px;'>" + (i+1) + "</span>";
+
+        }
+        pages+="</ul>";
+        $("#pages").html(pages);
+        $("#results").prepend("<h3>Results</h3>")
+      }
+      else{
+        $("#results").html("<h3>No results found</h3>")
+        $("#pages").html("");
+      }
+    };
+  });
+
+  function changePage(p) {
+    $("#results").html(html_div[p]);
+    location.href = "#results";
+  }
+
+  function alterType(type) {
+    if (type==null) {
+      type = "none";
+    }
+    type = type.toLowerCase();
+    if (type=="quiz/details") {
+      type = "Quiz / Quiz Item";
+    }
+    else if (type=="forum/thread") {
+      type = "thread";
+    }
+    return type;
+  }
+
+  function assignLink(type, link_url, gs_id) {
+    var group = "{{ groupid }}";
+    var base_url = location.host+"/"+group+"/";
+    GSystem_link = "";
+    
+    if (type != "none") {
+      GSystem_link = "http://" + base_url + link_url + "/" + gs_id;
+    }
+    else {
+      GSystem_link = "http://" + base_url + "search/node_info2/" + gs_id;
+    }
+
+    return GSystem_link;
+  }
+
+  function generateCard(name, GSystem_type, created_by, last_modified, GSystem_link) {
+    var card_html = "";
+
+      card_html += '<li class="card">';
+        card_html += '<div class="published ebook">';    
+          card_html += '<a href=' + GSystem_link + ' target="_blank"> ';
+            card_html += '<div class="row">';
+                  card_html += '<div class="small-12 columns">';                            
+                      card_html += '<b>';
+                        card_html += '<h4>'+name;
+                      card_html += '</b>';
+                  card_html += '</div>';
+                  card_html += '</div>';
+            card_html += '<hr/>';
+            card_html += GSystem_type + '</br>' + "last modified: " + last_modified;
+            card_html += '<div class="age">';
+                card_html += 'by <span data-gnow="" class="user" href="#"><i class="fi-torso"></i>' + created_by + '</span>';
+            card_html += '</div>';
+          card_html += '</a>';
+      card_html += '</li>'
+
+      return card_html;  
+  }
+    
+    function parse_data_adv(sData) {
+  $("#panel2").addClass("active");
+    $("#panel1").removeClass("active");
+  
+      var a = sData.length;
+
+      html_div[cur_page] = "<ul class='small-block-grid-1 medium-block-grid-3 large-block-grid-4'>";      
+      for (i=0; i<a; i++) {
+        if (sData[i].link != null) {
+          type = alterType(sData[i].link);
+          GSystem_link = assignLink(type, sData[i].link.toLowerCase(), sData[i]._id);
+
+          html_div[cur_page] += generateCard(sData[i].name, type, sData[i].created_by, sData[i].last_update, GSystem_link);
+
+          results_in_current_page += 1;
+          if (results_in_current_page >= results_per_page) {
+            html_div[cur_page] += "</ul>";
+            cur_page += 1;
+            results_in_current_page = 0;
+            html_div[cur_page] = "<ul class='small-block-grid-1 medium-block-grid-3 large-block-grid-4'>";
+          }
+        }
+      }
+      $("#resultsadv").html(html_div[page_no]);
+
+      pages = "<h6>Pages:</h6><hr>";
+      for (i=0; i < cur_page+1; i++) {
+        pages+= "<span onClick='changePage(" + i + ")' style='cursor:pointer;font-weight:bold'>" + (i+1) + "</span>";
+      }
+      //pages+="</ul>";
+      $("#pages").html(pages);
+    }
+  
+  $('#GSystems').change(function() {
+
+      temp = String($("#GSystems").val());
+
+      $.ajax({
+            type: "GET",
+            url: "{% url 'get_attributes' groupid %}",
+            datatype: "json",
+            data: {
+              GSystem: temp,
+              csrfmiddlewaretoken: '{{ csrf_token }}',
+            },
+            success: function(data) {
+          parsed = $.parseJSON(data);
+          //options_to_add = "<option value='all'>All attributes</option>";
+          for (i=0; i<parsed.length; i++) {
+            options_to_add += "<option value='" + parsed[i] + "'>" + parsed[i] + "</option>";
+          }
+          $("#attribs").html(options_to_add);
+          }
+      });
+  });
+
+  var GSystem_name = [];
+  $('#GSystems').change(function() {
+
+      temp = String($("#GSystems").val());
+
+      $.ajax({
+            type: "GET",
+            url: "{% url 'get_attributes' groupid %}",
+            datatype: "json",
+            data: {
+              GSystem: temp,
+              csrfmiddlewaretoken: '{{ csrf_token }}',
+            },
+            success: function(data) {
+              parsed = $.parseJSON(data);
+              options_to_add = "";//<option value='all'>All attributes</option>";
+              for (i=0; i<parsed.length; i++) {
+                options_to_add += "<option value='" + parsed[i] + "'>" + parsed[i] + "</option>";
+              }
+              $("#attribs").html(options_to_add);
+            }
+      });
+  });
+
+  $('#Groups').change(function(){
+    var Group_names = String($("#Groups").val());
+    
+
+    $.ajax({
+          type: "GET",
+          url: "{% url 'get_users' groupid %}",
+          datatype: "json",
+          data: {
+            Groups: Group_names,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+          },
+          success: function(data) {
+        parsed = $.parseJSON(data);
+        options_to_add = "<option value='all' selected='true'>All authors</option>";
+        for (i=0; i<parsed.length; i++) {
+          options_to_add += "<option value='" + parsed[i] + "'>" + parsed[i] + "</option>";
+        }
+        $("#Users").html(options_to_add);
+        }
+    });
+  });
+
+</script>
+
+<script type="text/javascript">
+  /*$('#GSystems').change(function(){
+      GSystem_name = $("#GSystems").val();
+
+      $.ajax({
+            type: "GET",
+            url: "{% url 'get_attributes' groupid %}",
+            datatype: "json",
+            data: {
+              GSystem: GSystem_name,
+              csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function(data) {
+          //json = jQuery.parseJSON(data);
+          parsed = $.parseJSON(data);
+          alert(parsed[0]);
+          options_to_add = "";
+          for (i=0; i<parsed.length; i++) {
+            options_to_add += "<option value='" + parsed[i]['name'] + "'>" + parsed[i]['name'] + "</option>";
+          }
+          alert(options_to_add);
+          $("#attribs").html(options_to_add);
+          }
+      });
+  });
+  $("#attribs").change(function() {
+    alert($("#attribs").val());
+  });*/
+</script>
+
+<script type="text/javascript">
+  var GSystem_name = [];
+  $("#search_text_rel").keyup(function(e){
+
+    // console.log(e.which);
+    var searchKey = $("#search_text_rel").val();
+    words = searchKey.split(' ');
+    cur_word = words[words.length-1];
+    already_typed = "";
+    pref = "";
+
+    if (words.length != 1) {
+      //console.log('not zero'+words);
+      for (i=0;i<words.length-1;i++) {
+        already_typed += ' ' + words[i];
+      }
+      pref = already_typed;
+    }
+    else {
+      //console.log('zero');
+      already_typed = searchKey;
+      pref = "";
+    }
+
+    if (already_typed != "" && cur_word != "") {
+      $.ajax({
+        url:"{% url 'get_relations_for_autoSuggest' groupid %}",
+        type:"GET",
+        dataType:"JSON",
+        data:{
+          sVal:cur_word,
+          prefix:pref
+        },
+        success:function(data){
+          //var str = "<select size='5' id='autocomplete' onChange='changed_val()'>";
+          var str = "<datalist style='color:#fff' id='datalist1'>";
+          for(i=0;i<data.length;i++){
+            str += "<option value='" + data[i].split('_').join(' ').trim() + "'>"; 
+          }
+          str += "</datalist>";     
+          console.log(data.length);
+          //dataVals = ["one", "two", "three"];
+          $("#suggestions").html(str);
+          //$( "#search_text" ).autocomplete({
+          //  source: data
+          //});
+        },
+        failure:function(data){
+          alert('GOT AN ERROR');
+        }     
+      });
+    }
+    else {
+      $("#suggestions").html("");
+    }
+    return false;
+  });
+
+  function changed_val() {
+    $("#search_text").val($("#autocomplete").val().trim());
+    console.log("click 2");
+  }
+
+  $(document).ready(function(){
+      scrollTo("results");
+  });
+  function scrollTo(hash) {
+    location.hash = "#" + hash;
+    
+  }
+
+
+</script>
+
+
+{% endblock %}
